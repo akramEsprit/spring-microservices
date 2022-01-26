@@ -1,0 +1,142 @@
+version: '3.4'
+services:
+  api-gateway:
+    build:
+      context: ./api-gateway
+    ports:
+      - "8080:8080"
+    #restart: on-failure
+    environment:
+      #overriding spring application.properties
+      - client-secret=9bbb4064-49d1-4830-998e-93478b4c4d99
+      - eureka.client.Url=http://host.docker.internal:9091/eureka/
+      - keycloak.server-url=http://host.docker.internal:18080/auth
+      - keycloak.realm=spring-micro-main
+    depends_on:
+      - eureka-server
+  eureka-server:
+    build:
+      context: ./eureka-server
+    ports:
+      - "9091:9091"
+    #restart: on-failure
+    environment:
+      - eureka.client.Url=http://host.docker.internal:9091/eureka/
+  config:
+    build:
+      context: ./config-server
+    ports:
+      - "8888:8888"
+    ##restart: on-failure
+    environment:
+       - spring.cloud.config.server.git.uri=https://github.com/akramEsprit/pfeConfigRepo.git
+  microservice-consumer:
+    build:
+      context: ./microservice-consumer
+    ports:
+      - "9080:9080"
+      #debug port
+      - 9678:9678
+    links:
+      - config
+      - kafka
+    #restart: on-failure
+    environment:
+      #overriding spring application.properties
+      - spring.cloud.config.uri=http://host.docker.internal:8888
+      - eureka.client.Url=http://host.docker.internal:9091/eureka/
+      - keycloak.server-url=http://host.docker.internal:18080/auth 
+      - keycloak.realm=spring-micro-main
+      - keycloak.id=spring-micro-consumer
+      - keycloak.secret=4edf822a-bf23-4e38-ae11-beda82a39ca1
+      - keycloak.redirect-uri=http://host.docker.internal:9080/login/oauth2/code/keycloak
+      - kafka-bootstrap.servers=http://host.docker.internal:29092
+      - debug_port=9678
+    depends_on:
+      - eureka-server
+      - kafka
+      - keycloak
+      - config
+  microservice-producer:
+    build:
+      context: ./microservice-producer
+    ports:
+      - "9081:9081"
+      - "8072:8072"
+    links:
+      - config
+      - kafka
+    #restart: on-failure
+    environment:
+      #overriding spring application.properties
+      - spring.cloud.config.uri=http://host.docker.internal:8888
+      - eureka.client.Url=http://host.docker.internal:9091/eureka/
+      - keycloak.server-url=http://host.docker.internal:18080/auth 
+      - keycloak.realm=spring-micro-main
+      - keycloak.id=spring-micro-producer
+      - keycloak.secret=0e7274ef-6451-4276-9efb-6baaed7285c3
+      - keycloak.redirect-uri=http://host.docker.internal:9080/login/oauth2/code/keycloak
+      - kafka-bootstrap.servers=http://host.docker.internal:29092
+    depends_on:
+      - eureka-server
+      - kafka
+      - keycloak
+      - config
+  keycloak:
+    image: jboss/keycloak:11.0.0
+    volumes:
+      - ./keycloak-server/realm-export.json:/tmp/keycloak/config/realm-export.json
+    environment:
+        KEYCLOAK_USER: admin
+        KEYCLOAK_PASSWORD: admin
+        KEYCLOAK_IMPORT: /tmp/keycloak/config/realm-export.json
+        DB_VENDOR: POSTGRES
+        DB_ADDR: postgres
+        DB_DATABASE: keycloak
+        DB_USER: keycloak
+        DB_SCHEMA: public
+        DB_PASSWORD: password
+    ports:
+      - "18080:18080"
+    command:
+      - "-b"
+      - "0.0.0.0"
+      - "-Djboss.socket.binding.port-offset=10000"
+      - "-Djboss.as.management.blocking.timeout=900000"
+    #restart: on-failure
+    depends_on:
+      - postgres
+  postgres:
+      image: postgres
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+      environment:
+        POSTGRES_DB: keycloak
+        POSTGRES_USER: keycloak
+        POSTGRES_PASSWORD: password
+  
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 2181:2181
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - 29092:29092
+      - 9092:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,RMOFF_DOCKER_HACK://host.docker.internal:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,RMOFF_DOCKER_HACK:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+volumes:
+    postgres_data:
+      name: keycloak_postgres_data
+      driver: local

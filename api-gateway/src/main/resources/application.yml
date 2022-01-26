@@ -1,0 +1,48 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: api-gateway
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            provider: keycloak
+            client-id: spring-micro-gateway
+            client-secret: ${client-secret}
+            authorization-grant-type: authorization_code
+            redirect-uri: http://localhost:8080/login/oauth2/code/keycloak
+            scope: openid
+        provider:
+          keycloak:
+            authorization-uri: ${keycloak.server-url}/realms/${keycloak.realm}/protocol/openid-connect/auth
+            token-uri: ${keycloak.server-url}/realms/${keycloak.realm}/protocol/openid-connect/token
+            user-info-uri: ${keycloak.server-url}/realms/${keycloak.realm}/protocol/openid-connect/userinfo
+            jwk-set-uri: ${keycloak.server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs
+            user-name-attribute: name
+            user-info-authentication-method: header
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${keycloak.server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs
+  cloud:
+    gateway:
+      routes:
+      - id: microservice-consumer
+        uri: lb://microservice-consumer
+        predicates:
+        - Path=/api/consume/**
+        filters:
+        - TokenRelay=
+        - RemoveRequestHeader=Cookie
+      - id: microservice-producer
+        uri: lb://microservice-producer
+        predicates:
+        - Path=/api/produce/**
+        filters:
+        - TokenRelay=
+        - RemoveRequestHeader=Cookie
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${eureka.client.Url}
