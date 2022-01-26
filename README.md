@@ -34,3 +34,5 @@ Via postman , Post a request to get an access token:
 
 
 Check microservice-consumer application logs , we had successfully send a message from producer to consumer via kafka.
+
+TO BE CONTINUED ...
