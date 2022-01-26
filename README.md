@@ -5,6 +5,7 @@ Architecture :
 
 ## Architecture 
 
+![Untitled Diagram drawio (1)](https://user-images.githubusercontent.com/48015774/151173097-656a8c17-6056-42fe-973c-68993d6c2c68.png)
 
 ## Install and run with docker
 `docker-compose up --build`
